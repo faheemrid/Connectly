@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+
+# React Native
+mobile/node_modules/
+server/node_modules/
+
+# Environment files
+server/.env
+mobile/.env
