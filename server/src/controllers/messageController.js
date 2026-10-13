@@ -24,8 +24,8 @@ const sendMessage = async (req, res) => {
       receiver: receiverId,
       text: text.trim(),
     });
-    const io=req.app.get("io")
-    io.to(receiverId.toString()).emit("receiveMessage",message)
+    const io = req.app.get("io");
+    io.to(receiverId.toString()).emit("receiveMessage", message);
     res.status(201).json({
       message: "Message sent successfully",
       data: message,
@@ -52,9 +52,12 @@ const getConversation = async (req, res) => {
         },
       ],
     }).sort({ createdAt: 1 });
+    console.log("req.user:", req.user);
+    console.log("userId:", userId);
+    console.log("messages:", messages);
     res.status(200).json({
       message: "Conversation fetched successfully",
-      messages:messages
+      messages: messages,
     });
   } catch (error) {
     console.error("Get conversation error:", error.message);
@@ -63,7 +66,33 @@ const getConversation = async (req, res) => {
     });
   }
 };
+const markMessagesAsRead = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await Message.updateMany(
+      {
+        sender: userId,
+        receiver: req.user,
+        isRead: false,
+      },
+      {
+        $set: {
+          isRead: true,
+        },
+      },
+    );
+    res.status(200).json({
+      message: "Messages marked as read",
+    });
+  } catch (error) {
+    console.log("Mark messages as read error:", error.message);
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
 module.exports = {
   sendMessage,
   getConversation,
+  markMessagesAsRead
 };

@@ -11,6 +11,8 @@ import {
   KeyboardAvoidingView,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BASE_URL } from '../config/api';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Register'>;
@@ -20,8 +22,13 @@ const RegisterScreen = ({ navigation }: Props) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   // const [phoneNo, setPhoneNo] = useState('');
-  const handleRegister = () => {
-    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword) {
+  const handleRegister = async () => {
+    if (
+      !name.trim() ||
+      !email.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim()
+    ) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -37,7 +44,34 @@ const RegisterScreen = ({ navigation }: Props) => {
       Alert.alert('Error', 'Passwords do not match');
       return;
     }
-    navigation.navigate("Loading")
+    try {
+      const response = await fetch(`${BASE_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        Alert.alert('Error', data.message || 'Registration failed');
+        return;
+      }
+      await AsyncStorage.setItem('token', data.token);
+      await AsyncStorage.setItem('user', JSON.stringify(data.user));
+      console.log('Registration successful!');
+      console.log('User:', data.user);
+      navigation.replace('Loading',{
+        nextScreen:'Login'
+      });
+    } catch (error) {
+      console.log('Register error:', error);
+      Alert.alert('Error', 'Unable to connect to the server');
+    }
   };
   return (
     <KeyboardAvoidingView

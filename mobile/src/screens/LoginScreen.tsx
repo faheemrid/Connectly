@@ -49,7 +49,9 @@ const LoginScreen = ({ navigation }: Props) => {
       console.log('Login successful!');
       console.log('Token saved successfully!');
 
-      navigation.replace('Loading');
+      navigation.replace('Loading',{
+        nextScreen:'Users'
+      });
     } catch (error) {
       console.log('Login error:', error);
       Alert.alert('Error', 'Unable to connect to the server');

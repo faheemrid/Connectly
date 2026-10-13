@@ -9,13 +9,14 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Loading'>;
-const LoadingScreen = ({ navigation }: Props) => {
+const LoadingScreen = ({ navigation ,route}: Props) => {
+  const {nextScreen}= route.params
   useEffect(() => {
     const timer = setTimeout(() => {
-      navigation.replace('Users');
-    }, 5000);
+      navigation.replace(nextScreen);
+    }, 3000);
     return () => clearTimeout(timer);
-  }, [navigation]);
+  }, [navigation,nextScreen]);
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />

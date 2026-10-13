@@ -13,9 +13,14 @@ export type RootStackParamList = {
   Welcome: undefined;
   Login: undefined;
   Register: undefined;
-  Loading: undefined;
+  Loading: {
+nextScreen : 'Login'|'Users'
+  }
   Users: undefined;
-  Chat: undefined;
+  Chat: {
+    userId: string;
+    userName: string;
+  };
 };
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const AppNavigator = () => {
@@ -38,7 +43,11 @@ const AppNavigator = () => {
           component={UsersScreen}
           options={{ headerShown: false }}
         />
-        <Stack.Screen name="Chat" component={ChatScreen} options={{headerShown:true}}/>
+        <Stack.Screen
+          name="Chat"
+          component={ChatScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

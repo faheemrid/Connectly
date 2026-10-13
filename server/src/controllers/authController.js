@@ -27,17 +27,29 @@ const registerUser = async (req, res) => {
       email,
       password: hashedPassword,
     });
-    res.status(201).json({
+    const token = jwt.sign(
+      {
+        userId: user._id,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+    return res.status(201).json({
       message: "User registered successfully",
+      token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
+        profileImage: user.profileImage,
+        isOnline: user.isOnline,
       },
     });
   } catch (error) {
     console.error("Register error:", error.message);
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error",
     });
   }

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 import {
   Text,
   View,
@@ -25,7 +26,11 @@ type User = {
 const UsersScreen = ({ navigation }: Props) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const fetchUsers = async () => {
+    console.log('🔥 FETCH USERS CALLED');
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -44,6 +49,7 @@ const UsersScreen = ({ navigation }: Props) => {
         Alert.alert('Error', data.message || 'Failed to fetch users');
         return;
       }
+      console.log('USERS API RESPONSE:', data.users);
       setUsers(data.users);
     } catch (error) {
       console.log('Fetch users error:', error);
@@ -52,15 +58,130 @@ const UsersScreen = ({ navigation }: Props) => {
       setLoading(false);
     }
   };
+  const getCurrentUser = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('user');
+      if (userData) {
+        setCurrentUser(JSON.parse(userData));
+      }
+    } catch (error) {
+      console.log('Get current user error:', error);
+    }
+  };
+  const formatLastSeen = (data: string | null) => {
+    if (!data) {
+      return 'Offline';
+    }
+    const lastSeen = new Date(data);
+    const now = currentTime;
+    const diffInMinutes = Math.floor(
+      (now.getTime() - lastSeen.getTime()) / (1000 * 60),
+    );
+    if (diffInMinutes < 1) {
+      return 'just Now';
+    }
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} min ago`;
+    }
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) {
+      return `${diffInHours} hr ago`;
+    }
+    return lastSeen.toLocaleDateString();
+  };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchUsers();
+    setRefreshing(false);
+  };
   useEffect(() => {
+    console.log('🔥 USERS EFFECT RUN');
+
     fetchUsers();
+    getCurrentUser();
+    let socket: Socket | null = null;
+    const connectSocket = async () => {
+      try {
+        const userData = await AsyncStorage.getItem('user');
+        if (!userData) {
+          console.log('Current user not found');
+          return;
+        }
+        const user = JSON.parse(userData);
+        if (!user?.id) {
+          console.log('Current user ID not found');
+          return;
+        }
+        console.log(' UsersScreen connecting socket...');
+        socket = io(BASE_URL);
+        socket.on('connect', () => {
+          console.log('UsersScreen socket connected', socket?.id);
+          socket?.emit('join', user.id);
+          console.log(' UsersScreen joined room:', user.id);
+        });
+        socket.on('userOnline', ({ userId }) => {
+          console.log('User Online:', userId);
+          setUsers(previousUsers =>
+            previousUsers.map(item =>
+              item._id === userId ? { ...item, isOnline: true } : item,
+            ),
+          );
+        });
+        socket.on('userOffline', ({ userId, lastSeen }) => {
+          console.log('User Offline:', userId);
+          console.log('Last Seen:', lastSeen);
+          setUsers(previousUsers => {
+            const updatedUsers = previousUsers.map(item =>
+              item._id === userId
+                ? {
+                    ...item,
+                    isOnline: false,
+                    lastSeen: lastSeen,
+                  }
+                : item,
+            );
+            console.log('UPDATED USERS:', updatedUsers);
+            return updatedUsers;
+          });
+        });
+        socket.on('disconnect', () => {
+          console.log(' UsersScreen socket disconnected');
+        });
+      } catch (error) {
+        console.log('UsersScreen socket error:', error);
+      }
+    };
+    connectSocket();
+    // return () => {
+    //   console.log('🔴 USERS SCREEN UNMOUNT');
+    //   console.log('UsersScreen closing socket...');
+    //   socket?.disconnect();
+    // };
+    return () => {
+      console.log(' UsersScreen closing socket...');
+      socket?.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    },  1000);
+    return () => {
+      clearInterval(timer);
+    };
   }, []);
   const renderUser = ({ item }: { item: User }) => {
     return (
       <TouchableOpacity
         style={styles.userCard}
         activeOpacity={0.8}
-        onPress={() => navigation.navigate('Chat')}
+        onPress={() =>
+          navigation.navigate('Chat', {
+            userId: item._id,
+            userName: item.name,
+          })
+        }
       >
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{item.name.charAt(0)}</Text>
@@ -71,7 +192,7 @@ const UsersScreen = ({ navigation }: Props) => {
           <Text style={styles.message}>{item.email}</Text>
         </View>
         <Text style={item.isOnline ? styles.online : styles.offline}>
-          {item.isOnline ? 'Online' : 'Offline'}
+          {item.isOnline ? 'Online' : formatLastSeen(item.lastSeen)}
         </Text>
       </TouchableOpacity>
     );
@@ -85,7 +206,9 @@ const UsersScreen = ({ navigation }: Props) => {
           <Text style={styles.headerSubtitle}>Your conversations</Text>
         </View>
         <View style={styles.profileAvatar}>
-          <Text style={styles.profileText}>F</Text>
+          <Text style={styles.profileText}>
+            {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+          </Text>
         </View>
       </View>
       {loading ? (
@@ -99,8 +222,10 @@ const UsersScreen = ({ navigation }: Props) => {
           data={users}
           keyExtractor={item => item._id}
           renderItem={renderUser}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { flexGrow: 1 }]}
           showsVerticalScrollIndicator={false}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
         />
       )}
     </View>
